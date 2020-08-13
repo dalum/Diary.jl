@@ -11,9 +11,13 @@ using Pkg
         Diary.GLOBAL_CONFIG.diary_file_name
     )
     @test Diary.find_diary() == default_path
-
-    # Test that the diary file was created.
     @test isfile(default_path)
+
+    env_path = joinpath(dirname(Pkg.project().path), "env_diary.jl")
+    ENV["JULIA_DIARY"] = env_path
+    @test Diary.find_diary() == env_path
+    @test isfile(env_path)
+    delete!(ENV, "JULIA_DIARY")
 
     # Test that the default environment is blacklisted by default.
     Pkg.activate("v$(VERSION.major).$(VERSION.minor)"; shared=true)

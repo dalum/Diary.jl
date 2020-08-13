@@ -192,6 +192,7 @@ function find_diary(previous_diary_file=nothing)
         end
         diary_file = joinpath(environment_directory, GLOBAL_CONFIG.diary_file_name)
     else
+        @debug "Diary.jl: JULIA_DIARY = $diary_file"
         diary_file = abspath(diary_file)
     end
     # Create the diary file if missing.
