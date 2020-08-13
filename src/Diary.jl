@@ -84,7 +84,8 @@ function watch_task(history_file, repl_history_file)
                 history_lines = readlines(history_file_handle)
                 @debug "Diary.jl ($history_file): History file has changed:" history_lines
                 # Copy history lines to the REPL history file
-                open(repl_history_file, write=true) do io
+                open(repl_history_file, read=true, write=true) do io
+                    seekend(io)
                     println(io, join(history_lines, '\n'))
                 end
                 # Parse history lines to put in the diary.
@@ -140,17 +141,23 @@ function watch_task(history_file, repl_history_file)
 end
 
 function find_diary()
-    environment_directory = dirname(Pkg.project().path)
-    # Exit early, if the directory is blacklisted.
-    is_blacklisted = any(GLOBAL_CONFIG.blacklist) do pat
-        !isnothing(match(pat, environment_directory))
-    end
-    if is_blacklisted
-        @debug "Diary.jl: $environment_directory found in blacklist"
-        return nothing
+    diary_file = get(ENV, "JULIA_DIARY", nothing)
+
+    if isnothing(diary_file)
+        environment_directory = dirname(Pkg.project().path)
+        # Exit early, if the directory is blacklisted.
+        is_blacklisted = any(GLOBAL_CONFIG.blacklist) do pat
+            !isnothing(match(pat, environment_directory))
+        end
+        if is_blacklisted
+            @debug "Diary.jl: $environment_directory found in blacklist"
+            return nothing
+        end
+        diary_file = joinpath(environment_directory, "diary.jl")
+    else
+        diary_file = abspath(diary_file)
     end
 
-    diary_file = joinpath(environment_directory, "diary.jl")
     !isfile(diary_file) && touch(diary_file)
     return diary_file
 end
@@ -163,8 +170,13 @@ function parse_history(history_lines)
             !(line in GLOBAL_CONFIG.break_lines) && empty!(diary_lines)
             break
         end
-        # Each line is indended with a '\t' character, so we skip the first index.
-        push!(diary_lines, line[2:end])
+        # Each line is indented with a '\t' character, so we skip the first index.
+        line = line[2:end]
+        # If the line ends with a ';', we strip it off:
+        while endswith(line, ';')
+            line = line[1:(end - 1)]
+        end
+        push!(diary_lines, line)
     end
     return reverse!(diary_lines)
 end
