@@ -9,7 +9,7 @@ mutable struct DiaryConfig
     write_header::Bool
     blacklist::Set{Regex}
     break_lines::Set{String}
-    author_name::String
+    author::String
     date_format::String
 end
 
@@ -33,9 +33,9 @@ struct TaskThunk
 end
 @noinline (thunk::TaskThunk)() = thunk.f(thunk.args...)
 
-function configure(; author_name=nothing, date_format=nothing)
-    if !isnothing(author_name)
-        GLOBAL_CONFIG.author_name = author_name
+function configure(; author=nothing, date_format=nothing)
+    if !isnothing(author)
+        GLOBAL_CONFIG.author = author
     end
     if !isnothing(date_format)
         GLOBAL_CONFIG.date_format = date_format
@@ -62,7 +62,7 @@ function __init__()
 end
 
 function write_header(io)
-    author = GLOBAL_CONFIG.author_name
+    author = GLOBAL_CONFIG.author
     date = Dates.format(Dates.now(), GLOBAL_CONFIG.date_format)
     print(io, "# ", author, ": ", date, '\n')
     print(io, '\n')

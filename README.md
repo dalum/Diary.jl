@@ -16,7 +16,7 @@ If you want to enable `Diary.jl` by default, put the following in your `~/.julia
 ```julia
 try
     using Diary
-    Diary.configure(author_name="<your name>")
+    Diary.configure(author="<your name>")
 catch e
     @warn(e.msg)
 end
