@@ -172,7 +172,7 @@ function parse_history(history_lines)
         end
         # Each line is indented with a '\t' character, so we skip the first index.
         line = line[2:end]
-        # If the line ends with a ';', we strip it off:
+        # If the line ends with a ';', we strip it off.
         while endswith(line, ';')
             line = line[1:(end - 1)]
         end
