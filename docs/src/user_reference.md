@@ -1,0 +1,5 @@
+# Developer reference
+
+```@docs
+configure
+```
