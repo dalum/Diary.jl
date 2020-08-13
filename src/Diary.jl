@@ -33,7 +33,7 @@ struct TaskThunk
 end
 @noinline (thunk::TaskThunk)() = thunk.f(thunk.args...)
 
-function config(; author_name=nothing, date_format=nothing)
+function configure(; author_name=nothing, date_format=nothing)
     if !isnothing(author_name)
         GLOBAL_CONFIG.author_name = author_name
     end
@@ -42,7 +42,7 @@ function config(; author_name=nothing, date_format=nothing)
     end
 end
 
-function enable()
+function __init__()
     repl_history_file = REPL.find_hist_file()
     history_file, history_file_handle = mktemp()
     # Copy existing REPL history into the temporary history file.
@@ -78,6 +78,7 @@ function watch_task(history_file, repl_history_file)
         # only track new changes.
         readlines(history_file_handle)
 
+        diary_file = nothing
         while watching
             file_event = FileWatching.watch_file(history_file)
             if file_event.changed
@@ -99,7 +100,7 @@ function watch_task(history_file, repl_history_file)
                     continue
                 end
 
-                diary_file = find_diary()
+                diary_file = find_diary(diary_file)
                 # Skip if a suitable diary file could not be found.
                 isnothing(diary_file) && continue
                 # Get the last line in the diary file.
@@ -140,7 +141,7 @@ function watch_task(history_file, repl_history_file)
     return true
 end
 
-function find_diary()
+function find_diary(previous_diary_file=nothing)
     diary_file = get(ENV, "JULIA_DIARY", nothing)
 
     if isnothing(diary_file)
@@ -157,8 +158,14 @@ function find_diary()
     else
         diary_file = abspath(diary_file)
     end
-
+    # Create the diary file if missing.
     !isfile(diary_file) && touch(diary_file)
+    # Write a new header, if the diary file has changed, i.e., if we switched project or
+    # manually set `ENV["JULIA_DIARY"]`.
+    if previous_diary_file != diary_file
+        GLOBAL_CONFIG.write_header = true
+    end
+
     return diary_file
 end
 

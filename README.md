@@ -9,8 +9,6 @@ Note: `Diary.jl` is still under development, but feedback is much appreciated.
 To try out `Diary.jl`, install it using `]add https://github.com/dalum/Diary.jl`. Then,
 ```julia
 julia> using Diary
-
-julia> Diary.enable()
 ```
 to get started.
 
@@ -18,8 +16,7 @@ If you want to enable `Diary.jl` by default, put the following in your `~/.julia
 ```julia
 try
     using Diary
-    Diary.config(author_name="<your name>")
-    Diary.enable()
+    Diary.configure(author_name="<your name>")
 catch e
     @warn(e.msg)
 end
