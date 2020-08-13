@@ -63,11 +63,17 @@ function configure(; kwargs...)
 end
 
 function __init__()
+    # Only run the watcher if we are running in interactive mode.
+    !isinteractive() && return nothing
+    # Locate the current history file used by the REPL, so we can keep it updated.
     repl_history_file = REPL.find_hist_file()
+    # Create a new, temporary history file that we track.  This protects our diary from
+    # being cluttered by changes to the global history, which may not originate from our
+    # current session.
     history_file = tempname()
     # Copy existing REPL history into the temporary history file.
     cp(repl_history_file, history_file)
-    # Set the REPL history file to the temporary file.
+    # Set the REPL history file to the temporary history file.
     ENV["JULIA_HISTORY"] = history_file
 
     @debug "Diary.jl: Watching: $history_file"
@@ -175,6 +181,7 @@ function find_diary(previous_diary_file=nothing)
 
     if isnothing(diary_file)
         environment_directory = dirname(Pkg.project().path)
+        @debug "Diary.jl: using $environment_directory as diary root folder"
         # Exit early, if the directory is blacklisted.
         is_blacklisted = any(GLOBAL_CONFIG.blacklist) do pat
             !isnothing(match(pat, environment_directory))
@@ -183,7 +190,7 @@ function find_diary(previous_diary_file=nothing)
             @debug "Diary.jl: $environment_directory found in blacklist"
             return nothing
         end
-        diary_file = joinpath(environment_directory, "diary.jl")
+        diary_file = joinpath(environment_directory, GLOBAL_CONFIG.diary_file_name)
     else
         diary_file = abspath(diary_file)
     end
