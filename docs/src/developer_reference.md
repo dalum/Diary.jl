@@ -1,11 +1,11 @@
 # Developer reference
 
 ```@docs
-start_watching
-watch_task
-find_diary
-parse_history
-write_header
-DiaryConfig
-TaskThunk
+Diary.start_watching
+Diary.watch_task
+Diary.find_diary
+Diary.parse_history
+Diary.write_header
+Diary.DiaryConfig
+Diary.TaskThunk
 ```

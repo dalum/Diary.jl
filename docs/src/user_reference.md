@@ -1,5 +1,5 @@
-# Developer reference
+# User reference
 
 ```@docs
-configure
+Diary.configure
 ```
