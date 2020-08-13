@@ -58,6 +58,7 @@ function enable()
 
     @debug "Diary.jl: Watching: $history_file"
     start_watching(history_file, repl_history_file)
+    return nothing
 end
 
 function write_header(io)
