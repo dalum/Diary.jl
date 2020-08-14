@@ -18,10 +18,14 @@ to get started.
 
 If you want to enable `Diary.jl` by default, put the following in your `~/.julia/config/startup.jl` file:
 ```julia
-try
-    using Diary
-    Diary.configure(author="<your name>")
-catch e
-    @warn(e.msg)
+atreplinit() do repl
+    try
+        @eval begin
+            using Diary
+            Diary.configure(author="<your name>")
+        end
+    catch e
+        @warn(e.msg)
+    end
 end
 ```
