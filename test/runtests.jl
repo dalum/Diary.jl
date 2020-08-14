@@ -132,6 +132,23 @@ end
     Diary.commit(; diary_file, configuration)
 
     @test readlines(Diary.find_diary(; configuration)) == ["# Test: ", "", "a = rand(100)"]
+
+    push!(Diary.GLOBAL_SEGMENT_BUFFER, ["function f(x)", "    return x^2", "end"])
+
+    diary_file = Diary.find_diary(; configuration)
+    Diary.commit(; diary_file, configuration, with_header=false)
+
+    expected_output = [
+        "# Test: ",
+        "",
+        "a = rand(100)",
+        "",
+        "function f(x)",
+        "    return x^2",
+        "end",
+        "",
+    ]
+    @test readlines(Diary.find_diary(; configuration)) == expected_output
 end
 
 end # module
