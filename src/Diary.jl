@@ -95,7 +95,8 @@ function watch_task(history_file, repl_history_file=nothing)
                 # project or manually set `ENV["JULIA_DIARY"]`.
                 with_header = previous_diary_file != diary_file
                 previous_diary_file = diary_file
-                commit(; configuration, diary_file, with_header)
+                # Commit the latest segment.
+                commit(1; configuration, diary_file, with_header)
             end
         end
     catch e
@@ -151,7 +152,7 @@ function parse_command(cmd)
     if args[1] == "commit"
         length(args) == 1 && return commit()
         length(args) == 2 && return commit(parse(Int, args[2]))
-        @error("Diary.jl: too many arguments to `commit`: $(length(args) - 1)")
+        @error("Diary.jl: too many arguments to `commit`: $(length(args) - 1), expected 1")
     else
         @error("Diary.jl: could not parse command: $cmd")
     end
@@ -241,14 +242,11 @@ function commit(
     # Prevent committing more lines than are in the buffer.
     n = min(n, length(GLOBAL_SEGMENT_BUFFER))
     @debug "Diary.jl: committing $n lines to $diary_file"
-    # Get the last line in the diary file.
-    last_diary_line = let
-        lines = readlines(diary_file)
-        iszero(length(lines)) ? "" : lines[end]
-    end
     # Update the diary file.
     open(diary_file, read=true, write=true) do io
-        seekend(io)
+        # Get the last line in the diary file.
+        diary_lines = readlines(io)
+        last_diary_line = iszero(length(diary_lines)) ? "" : diary_lines[end]
         for segment in GLOBAL_SEGMENT_BUFFER[(end - n + 1):end]
             if with_header
                 # Insert an extra newline before the header, if the previous line
