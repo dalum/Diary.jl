@@ -27,6 +27,13 @@ using Pkg
 	"\tstatus",
     ]
     @test Diary.parse_history(history_lines) == []
+
+    history_lines = [
+        "# time: ***",
+        "# mode: julia",
+	"\t# diary: commit",
+    ]
+    @test Diary.parse_history(history_lines) == []
 end
 
 @testset "Command Parsing" begin
@@ -34,15 +41,10 @@ end
     @test Diary.parse_command(cmd) == 0
     cmd = "commit 1"
     @test Diary.parse_command(cmd) == 0
+    cmd = "commit 1 2"
+    @test_logs (:error, "Diary.jl: too many arguments to `commit`: 2") Diary.parse_command(cmd)
     cmd = "unsupported command"
     @test_logs (:error, "Diary.jl: could not parse command: $cmd") Diary.parse_command(cmd)
-
-    history_lines = [
-        "# time: ***",
-        "# mode: julia",
-	"\t# diary: commit",
-    ]
-    @test Diary.parse_history(history_lines) == 0
 end
 
 @testset "Finding configuration" begin

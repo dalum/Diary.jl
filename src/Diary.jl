@@ -151,7 +151,7 @@ function parse_command(cmd)
     if args[1] == "commit"
         length(args) == 1 && return commit()
         length(args) == 2 && return commit(parse(Int, args[2]))
-        @error("Diary.jl: too many arguments to `commit`: $(length(args))")
+        @error("Diary.jl: too many arguments to `commit`: $(length(args) - 1)")
     else
         @error("Diary.jl: could not parse command: $cmd")
     end
