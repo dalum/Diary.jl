@@ -42,7 +42,7 @@ end
     cmd = "commit 1"
     @test Diary.parse_command(cmd) == 0
     cmd = "commit 1 2"
-    @test_logs (:error, "Diary.jl: too many arguments to `commit`: 2") Diary.parse_command(cmd)
+    @test_logs (:error, "Diary.jl: too many arguments to `commit`: 2, expected 1") Diary.parse_command(cmd)
     cmd = "unsupported command"
     @test_logs (:error, "Diary.jl: could not parse command: $cmd") Diary.parse_command(cmd)
 end
