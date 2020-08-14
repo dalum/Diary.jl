@@ -142,10 +142,10 @@ function parse_history(history_lines)
 end
 
 """
-    parse_history(history_lines)
+    parse_command(cmd)
 
-Parse the lines in `history_lines`, strip trailing semi-colons, and determine if they should
-be written to the diary based on the mode in which they were entered.
+Parse the diary command, `cmd`.  Valid commands are:
+- `commit [n]`: Commit the last `n` segments.
 """
 function parse_command(cmd)
     args = split(cmd)
@@ -159,9 +159,10 @@ function parse_command(cmd)
 end
 
 """
-    find_diary()
+    find_diary(; configuration=read_configuration())
 
-Locate the diary file.
+Locate the diary file.  The default diary name and blacklist is read from `configuration`.
+See also [`read_configuration()`](@ref).
 """
 function find_diary(; configuration=read_configuration())
     diary_file = get(ENV, "JULIA_DIARY", nothing)
@@ -188,12 +189,22 @@ function find_diary(; configuration=read_configuration())
     return diary_file
 end
 
+"""
+    read_configuration(filename=find_configuration_file())
+
+Read the configuration from `filename`.  See also [`find_configuration_file`](@ref).
+"""
 function read_configuration(filename=find_configuration_file())
     configuration = default_configuration()
     (isnothing(filename) || !isfile(filename)) && return configuration
     return merge!(configuration, Pkg.TOML.parsefile(filename))
 end
 
+"""
+    find_configuration_file()
+
+Locate the configuration file.
+"""
 function find_configuration_file()
     # If `ENV["JULIA_DIARY_CONFIG"]` is set, return that.
     filename = get(ENV, "JULIA_DIARY_CONFIG", nothing)
@@ -209,6 +220,11 @@ function find_configuration_file()
     return nothing
 end
 
+"""
+    default_configuration()
+
+Return the default configuration.
+"""
 function default_configuration()
     return Dict{String,Any}(
         "author" => "",
