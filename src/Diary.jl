@@ -5,6 +5,8 @@ using FileWatching: FileWatching
 using Pkg: Pkg
 using REPL: REPL
 
+const GLOBAL_SEGMENT_BUFFER = Vector{String}[]
+
 """
     thunk = TaskThunk(f, args)
 
@@ -16,51 +18,6 @@ struct TaskThunk
     args
 end
 @noinline (thunk::TaskThunk)() = thunk.f(thunk.args...)
-
-"""
-    DiaryConfig
-
-Mutable configuration for Diary.jl.  Diary.jl contains a single global instance of this
-type, `GLOBAL_CONFIG`.  Configuration of Diary.jl should be done through [`configure`](@ref)
-rather than direct manipulations of `GLOBAL_CONFIG`.
-"""
-mutable struct DiaryConfig
-    write_header::Bool
-    blacklist::Set{Regex}
-    author::String
-    date_format::String
-    diary_file_name::String
-end
-
-const GLOBAL_CONFIG = DiaryConfig(
-    true,
-    Set([r"\.julia\/environments\/v[0-9]+\.[0-9]+"]),
-    "",
-    "E U d HH:MM",
-    "diary.jl",
-)
-
-"""
-    configure(; kwargs...)
-
-Change configuration for Diary.jl in the current session.
-
-## Supported keywords
- - `author`: Author name put in the header.  (default: "")
- - `date_format`: `Dates.format`--compatible date format used in the header.
-    (default: "E U d HH:MM")
- - `diary_file_name`: Default name of the diary file.  (default: "diary.jl")
-
-!!! note
-    If `ENV["JULIA_DIARY"]` is set, the diary file name will be ignored.
-"""
-function configure(; kwargs...)
-    for arg in (:author, :date_format, :diary_file_name)
-        value = get(kwargs, arg, nothing)
-        !isnothing(value) && setfield!(GLOBAL_CONFIG, arg, value)
-    end
-    return nothing
-end
 
 function __init__()
     # Only run the watcher if we are running in interactive mode.
@@ -75,7 +32,6 @@ function __init__()
     cp(repl_history_file, history_file)
     # Set the REPL history file to the temporary history file.
     ENV["JULIA_HISTORY"] = history_file
-
     @debug "Diary.jl: Watching: $history_file"
     start_watching(history_file, repl_history_file)
     return nothing
@@ -104,7 +60,7 @@ function watch_task(history_file, repl_history_file=nothing)
         readlines(history_file_handle)
         # We set the diary file to `nothing` outside the loop so we can keep track of the
         # file location and whether it changes while the task is running.
-        diary_file = nothing
+        previous_diary_file = nothing
         while watching
             file_event = FileWatching.watch_file(history_file)
             if file_event.changed
@@ -120,90 +76,35 @@ function watch_task(history_file, repl_history_file=nothing)
                 # Parse history lines to put in the diary.
                 diary_lines = parse_history(history_lines)
                 iszero(length(diary_lines)) && continue
-                diary_lines_string = join(diary_lines, '\n')
                 # Skip if the lines do not parse.
                 try
-                    Meta.parse(diary_lines_string)
+                    Meta.parse(join(diary_lines, '\n'))
                 catch e
                     continue
                 end
+                push!(GLOBAL_SEGMENT_BUFFER, diary_lines)
+                # Read user configuration.
+                configuration = read_configuration()
+                # Skip if auto-committing is disabled.
+                !configuration["autocommit"] && continue
                 # Locate the diary file.
-                diary_file = find_diary(diary_file)
+                diary_file = find_diary(; configuration)
                 # Skip if a suitable diary file could not be found.
                 isnothing(diary_file) && continue
-                # Get the last line in the diary file.
-                last_diary_line = let
-                    lines = readlines(diary_file)
-                    iszero(length(lines)) ? "" : lines[end]
-                end
-                # Update the diary file.
-                open(diary_file, read=true, write=true) do io
-                    seekend(io)
-                    if GLOBAL_CONFIG.write_header
-                        # Insert an extra newline before the header, if the previous line
-                        # exists and contains non-whitespace characters.
-                        !all(isspace, last_diary_line) && print(io, '\n')
-                        write_header(io)
-                        GLOBAL_CONFIG.write_header = false
-                    elseif (
-                        length(diary_lines) > 1
-                        && !startswith(last_diary_line, "#")
-                        && !all(isspace, last_diary_line)
-                    )
-                        # Print an extra newline before multiline entries, if the last line
-                        # was not a comment or a newline.
-                        print(io, '\n')
-                    end
-                    # Write the parsed lines to the diary.
-                    print(io, diary_lines_string, '\n')
-                    # Always print an extra newline after multiline entries.
-                    length(diary_lines) > 1 && print(io, '\n')
-                end
+                # Write a new header, if the diary file has changed, i.e., if we switched
+                # project or manually set `ENV["JULIA_DIARY"]`.
+                with_header = previous_diary_file != diary_file
+                previous_diary_file = diary_file
+                commit(; configuration, diary_file, with_header)
             end
         end
     catch e
-        @error "Diary.jl ($history_file): $diary_file" exception=(e, catch_backtrace())
+        @error "Diary.jl ($history_file)" exception=(e, catch_backtrace())
     finally
         # Clean-up.
         close(history_file_handle)
     end
     return nothing
-end
-
-"""
-    find_diary(previous_diary_file=nothing)
-
-Locate the diary file.  If `previous_diary_file` is `nothing` or is different from the
-located diary file, also set the global `write_header` flag to true.
-"""
-function find_diary(previous_diary_file=nothing)
-    diary_file = get(ENV, "JULIA_DIARY", nothing)
-
-    if isnothing(diary_file)
-        environment_directory = dirname(Pkg.project().path)
-        @debug "Diary.jl: using $environment_directory as diary root folder"
-        # Exit early, if the directory is blacklisted.
-        is_blacklisted = any(GLOBAL_CONFIG.blacklist) do pat
-            !isnothing(match(pat, environment_directory))
-        end
-        if is_blacklisted
-            @debug "Diary.jl: $environment_directory found in blacklist"
-            return nothing
-        end
-        diary_file = joinpath(environment_directory, GLOBAL_CONFIG.diary_file_name)
-    else
-        @debug "Diary.jl: JULIA_DIARY = $diary_file"
-        diary_file = abspath(diary_file)
-    end
-    # Create the diary file if missing.
-    !isfile(diary_file) && touch(diary_file)
-    # Write a new header, if the diary file has changed, i.e., if we switched project or
-    # manually set `ENV["JULIA_DIARY"]`.
-    if previous_diary_file != diary_file
-        GLOBAL_CONFIG.write_header = true
-    end
-
-    return diary_file
 end
 
 """
@@ -224,6 +125,12 @@ function parse_history(history_lines)
         end
         # Each line is indented with a '\t' character, so we skip the first index.
         line = line[2:end]
+        if startswith(line, "# diary: ")
+            cmd = strip(line[9:end])
+            @debug "Diary.jl: got command: $cmd"
+            parse_command(cmd)
+            break
+        end
         # If the line ends with a ';', we strip it off.
         while endswith(line, ';')
             line = line[1:(end - 1)]
@@ -234,13 +141,151 @@ function parse_history(history_lines)
 end
 
 """
+    parse_history(history_lines)
+
+Parse the lines in `history_lines`, strip trailing semi-colons, and determine if they should
+be written to the diary based on the mode in which they were entered.
+"""
+function parse_command(cmd)
+    args = split(cmd)
+    if args[1] == "commit"
+        length(args) == 1 && return commit()
+        length(args) == 2 && return commit(parse(Int, args[2]))
+        @error("Diary.jl: too many arguments to `commit`: $(length(args))")
+    else
+        @error("Diary.jl: could not parse command: $cmd")
+    end
+end
+
+"""
+    find_diary()
+
+Locate the diary file.
+"""
+function find_diary(; configuration=read_configuration())
+    diary_file = get(ENV, "JULIA_DIARY", nothing)
+
+    if isnothing(diary_file)
+        environment_directory = dirname(Pkg.project().path)
+        @debug "Diary.jl: using $environment_directory as diary root folder"
+        # Exit early, if the directory is blacklisted.
+        is_blacklisted = any(configuration["blacklist"]) do needle
+            occursin(needle, environment_directory)
+        end
+        if is_blacklisted
+            @debug "Diary.jl: $environment_directory is blacklisted"
+            return nothing
+        end
+        diary_file = joinpath(environment_directory, configuration["diary_name"])
+    else
+        @debug "Diary.jl: JULIA_DIARY = $diary_file"
+        diary_file = abspath(diary_file)
+    end
+    # Create the diary file if missing.
+    !isfile(diary_file) && touch(diary_file)
+
+    return diary_file
+end
+
+function read_configuration(filename=find_configuration_file())
+    configuration = default_configuration()
+    (isnothing(filename) || !isfile(filename)) && return configuration
+    return merge!(configuration, Pkg.TOML.parsefile(filename))
+end
+
+function find_configuration_file()
+    # If `ENV["JULIA_DIARY_CONFIG"]` is set, return that.
+    filename = get(ENV, "JULIA_DIARY_CONFIG", nothing)
+    !isnothing(filename) && return abspath(filename)
+    # Otherwise, if a `Diary.toml` is found in the current project, return it.
+    environment_directory = dirname(Pkg.project().path)
+    filename = joinpath(environment_directory, "Diary.toml")
+    isfile(filename) && return abspath(filename)
+    # Fall back to returning `~/.julia/config/Diary.toml`, if it exists.
+    filename = joinpath(ENV["HOME"], ".julia", "config", "Diary.toml")
+    isfile(filename) && return abspath(filename)
+    # No configuration file could be found.
+    return nothing
+end
+
+function default_configuration()
+    return Dict{String,Any}(
+        "author" => "",
+        "diary_name" => "diary.jl",
+        "date_format" => "E U d HH:MM",
+        "autocommit" => true,
+        "blacklist" => [
+           joinpath(ENV["HOME"], ".julia", "environments"),
+        ]
+    )
+end
+
+"""
+    commit(n; kwargs...)
+
+Commit the `n` latest recorded lines to the diary file.
+
+# Keyword arguments
+- `configuration`: (default: `read_configuration()`)
+- `diary_file`: (default: `find_diary(; configuration)`)
+- `with_header`: Write header before lines. (default: `true`)
+"""
+function commit(
+    n = length(GLOBAL_SEGMENT_BUFFER);
+    configuration = read_configuration(),
+    diary_file = find_diary(; configuration),
+    with_header = true,
+)
+    # If the diary file could not be found, no lines were written
+    isnothing(diary_file) && return 0
+    # Prevent committing more lines than are in the buffer.
+    n = min(n, length(GLOBAL_SEGMENT_BUFFER))
+    @debug "Diary.jl: committing $n lines to $diary_file"
+    # Get the last line in the diary file.
+    last_diary_line = let
+        lines = readlines(diary_file)
+        iszero(length(lines)) ? "" : lines[end]
+    end
+    # Update the diary file.
+    open(diary_file, read=true, write=true) do io
+        seekend(io)
+        for segment in GLOBAL_SEGMENT_BUFFER[(end - n + 1):end]
+            if with_header
+                # Insert an extra newline before the header, if the previous line
+                # exists and contains non-whitespace characters.
+                !all(isspace, last_diary_line) && print(io, '\n')
+                write_header(io; configuration)
+                with_header = false
+            elseif (
+                length(segment) > 1
+                && !startswith(last_diary_line, "#")
+                && !all(isspace, last_diary_line)
+            )
+                # Print an extra newline before multiline entries, if the last line
+                # was not a comment or a newline.
+                print(io, '\n')
+            end
+
+            # Write the segment to the diary.
+            join(io, segment, '\n')
+            print(io, '\n')
+            # Always print an extra newline after multiline entries.
+            length(segment) > 1 && print(io, '\n')
+        end
+    end
+    # Clear the segment buffer.
+    empty!(GLOBAL_SEGMENT_BUFFER)
+    return n
+end
+
+"""
     write_header(io)
 
 Write a header to the IO stream, `io`.
 """
-function write_header(io)
-    author = GLOBAL_CONFIG.author
-    date = Dates.format(Dates.now(), GLOBAL_CONFIG.date_format)
+function write_header(io; configuration=read_configuration())
+    author = configuration["author"]
+    date = Dates.format(Dates.now(), configuration["date_format"])
     print(io, "# ", author, ": ", date, '\n')
     print(io, '\n')
     return io
