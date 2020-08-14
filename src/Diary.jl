@@ -217,8 +217,9 @@ function parse_history(history_lines)
     diary_lines = String[]
     for line in reversed_history_lines
         if startswith(line, "# mode: ")
-            mode = Symbol(line[8:end])
-            mode != "julia" && empty!(diary_lines)
+            mode = Symbol(strip(line[8:end]))
+            @debug "Diary.jl: mode line found: $mode"
+            mode != :julia && empty!(diary_lines)
             break
         end
         # Each line is indented with a '\t' character, so we skip the first index.

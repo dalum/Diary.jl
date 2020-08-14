@@ -24,6 +24,31 @@ using Pkg
     @test isnothing(Diary.find_diary())
 end
 
+@testset "Line parsing" begin
+    history_lines = [
+        "# time: ***",
+        "# mode: julia",
+	"\ta = rand(100);",
+    ]
+    @test Diary.parse_history(history_lines) == ["a = rand(100)"]
+
+    history_lines = [
+        "# time: ***",
+        "# mode: julia",
+	"\tstruct MyStruct",
+	"\t    field::Any",
+	"\tend",
+    ]
+    @test Diary.parse_history(history_lines) == ["struct MyStruct", "    field::Any", "end"]
+
+    history_lines = [
+        "# time: ***",
+        "# mode: pkg",
+	"\tstatus",
+    ]
+    @test Diary.parse_history(history_lines) == []
+end
+
 @testset "Header" begin
     Pkg.activate()
     Diary.configure(author="Test", date_format="")
