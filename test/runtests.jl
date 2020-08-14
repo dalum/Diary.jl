@@ -36,6 +36,13 @@ end
     @test Diary.parse_command(cmd) == 0
     cmd = "unsupported command"
     @test_logs (:error, "Diary.jl: could not parse command: $cmd") Diary.parse_command(cmd)
+
+    history_lines = [
+        "# time: ***",
+        "# mode: julia",
+	"\t# diary: commit",
+    ]
+    @test Diary.parse_history(history_lines) == 0
 end
 
 @testset "Finding configuration" begin
