@@ -168,17 +168,21 @@ function find_diary(; configuration=read_configuration())
     diary_file = get(ENV, "JULIA_DIARY", nothing)
 
     if isnothing(diary_file)
-        environment_directory = dirname(Pkg.project().path)
-        @debug "Diary.jl: using $environment_directory as diary root folder"
+        if configuration["directory_mode"]
+            root_directory = pwd()
+        else
+            root_directory = dirname(Pkg.project().path)
+        end
+        @debug "Diary.jl: using $root_directory as diary root folder"
         # Exit early, if the directory is blacklisted.
         is_blacklisted = any(configuration["blacklist"]) do needle
-            occursin(needle, environment_directory)
+            occursin(needle, root_directory)
         end
         if is_blacklisted
-            @debug "Diary.jl: $environment_directory is blacklisted"
+            @debug "Diary.jl: $root_directory is blacklisted"
             return nothing
         end
-        diary_file = joinpath(environment_directory, configuration["diary_name"])
+        diary_file = joinpath(root_directory, configuration["diary_name"])
     else
         @debug "Diary.jl: JULIA_DIARY = $diary_file"
         diary_file = abspath(diary_file)
@@ -231,6 +235,7 @@ function default_configuration()
         "diary_name" => "diary.jl",
         "date_format" => "E U d HH:MM",
         "autocommit" => true,
+        "directory_mode" => false,
         "blacklist" => [
            joinpath(ENV["HOME"], ".julia", "environments"),
         ]

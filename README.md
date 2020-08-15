@@ -4,9 +4,9 @@
 [![Build Status](https://travis-ci.org/dalum/Diary.jl.svg?branch=master)](https://travis-ci.org/dalum/Diary.jl)
 [![codecov](https://codecov.io/gh/dalum/Diary.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/dalum/Diary.jl)
 
-Diary.jl keeps a copy of what you type in the REPL in a `diary.jl` file in the root of your current active environment (the same location where your `Project.toml` and `Manifest.toml` files lie).  It helps you sketch out ideas in the REPL, which can then later be refined, by editing and copying relevant pieces from `diary.jl`.
+Diary.jl keeps a copy of what you type in the REPL in a file called `diary.jl`.  The file location defaults to the root of your current active project (the same location where your `Project.toml` and `Manifest.toml` files lie).  Please read the documentation (links above) for instructions on how to configure Diary.jl to your needs.
 
-Note: Diary.jl is still under development, but feedback is much appreciated.
+If you encounter an issue or have a suggestion for improvement of the package, please open an issue or pull request.  All contributions from all people are welcome!
 
 ## Usage
 

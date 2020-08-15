@@ -56,6 +56,7 @@ end
         "diary_name" => "diary.jl",
         "date_format" => "E U d HH:MM",
         "autocommit" => true,
+        "directory_mode" => false,
         "blacklist" => [
            joinpath(ENV["HOME"], ".julia", "environments"),
         ]
@@ -97,6 +98,18 @@ end
     # Test that the default environment is blacklisted by default.
     Pkg.activate("v$(VERSION.major).$(VERSION.minor)"; shared=true)
     @test isnothing(Diary.find_diary())
+
+    Pkg.activate()
+    configuration = Dict{String,Any}(
+        "directory_mode" => true,
+        "diary_name" => "diary.jl",
+        "blacklist" => [],
+    )
+    directory = mktempdir(dirname(Pkg.project().path))
+    expected_dir = abspath(joinpath(directory, "diary.jl"))
+    cd(directory) do
+        @test Diary.find_diary(; configuration) == expected_dir
+    end
 end
 
 @testset "Header" begin
@@ -124,6 +137,7 @@ end
         "author" => "Test",
         "date_format" => "",
         "diary_name" => "diary.jl",
+        "directory_mode" => false,
         "blacklist" => [],
     )
     push!(Diary.GLOBAL_SEGMENT_BUFFER, ["a = rand(100)"])
