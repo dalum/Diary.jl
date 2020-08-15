@@ -2,6 +2,7 @@ module TestDiary
 
 using Test, Diary
 
+using FileWatching
 using Pkg
 
 @testset "History Parsing" begin
@@ -180,6 +181,10 @@ end
         join(io, ["author = \"Test\"", "date_format = \"\""], "\n")
         print(io, "\n")
     end
+
+    @test Diary.read_configuration()["author"] == "Test"
+    @test Diary.read_configuration()["date_format"] == ""
+
     # Simulate user interaction by writing lines to the history file.
     history_lines = [
         "# time: ***",
@@ -191,10 +196,11 @@ end
         join(io, history_lines, "\n")
         print(io, "\n")
     end
-    # Allow the watch task to update the diary file.
-    sleep(0.1)
-
+    # Allow the `watch_task` to update the diary file.
+    file_event = FileWatching.watch_file(diary_file)
+    @test file_event.changed
     @test readlines(diary_file) == ["# Test: ", "", "a = rand(100)"]
+
     # Clean-up
     rm(diary_file)
 end
