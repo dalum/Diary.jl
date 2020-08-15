@@ -197,8 +197,24 @@ end
         print(io, "\n")
     end
     # Allow the `watch_task` to update the diary file.
-    file_event = FileWatching.watch_file(diary_file, 5)
+    file_event = FileWatching.watch_file(diary_file, 1)
     @test file_event.changed || file_event.timedout
+    @test readlines(diary_file) == ["# Test: ", "", "a = rand(100)"]
+
+    # Add line with incorrect syntax and check that it does not update the diary file.
+    history_lines = [
+        "# time: ***",
+        "# mode: julia",
+	"\ta b c d e",
+    ]
+    open(history_file, read=true, write=true) do io
+        seekend(io)
+        join(io, history_lines, "\n")
+        print(io, "\n")
+    end
+    # Allow the `watch_task` to update the diary file.
+    file_event = FileWatching.watch_file(diary_file, 1)
+    @test file_event.timedout
     @test readlines(diary_file) == ["# Test: ", "", "a = rand(100)"]
 
     # Clean-up
