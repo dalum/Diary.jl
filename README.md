@@ -6,7 +6,7 @@
 
 Diary.jl keeps a copy of what you type in the REPL in a file called `diary.jl`.  The file location defaults to the root of your current active project (the same location where your `Project.toml` and `Manifest.toml` files lie).  Please read the documentation (links above) for instructions on how to configure Diary.jl to your needs.
 
-If you encounter an issue or have suggestions for how to improve the package, please open an issue or pull request.  All contributions from all people are welcome!
+If you encounter any problems or have suggestions for how to improve the package, please open an issue or pull request.  All contributions from all people are welcome!
 
 ## Usage
 
