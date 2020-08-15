@@ -10,7 +10,7 @@ Note: `Diary.jl` is still under development, but feedback is much appreciated.
 
 ## Usage
 
-To try out `Diary.jl`, install it using `]add https://github.com/dalum/Diary.jl`. Then,
+To try out `Diary.jl`, install it using `]add Diary`. Then,
 ```julia
 julia> using Diary
 ```
@@ -20,12 +20,9 @@ If you want to enable `Diary.jl` by default, put the following in your `~/.julia
 ```julia
 atreplinit() do repl
     try
-        @eval begin
-            using Diary
-            Diary.configure(author="<your name>")
-        end
+        @eval using Diary
     catch e
-        @warn(e.msg)
+        @warn e
     end
 end
 ```
