@@ -9,6 +9,8 @@ makedocs(
     pages = [
         "Index" => "index.md",
         "introduction.md",
+        "configuration.md",
+        "how_it_works.md",
         "developer_reference.md",
     ],
 )

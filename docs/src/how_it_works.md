@@ -1,0 +1,7 @@
+# How it works
+
+When Diary.jl is loaded, it finds the location of the active history file and saves it to an internal variable called `repl_history_file`.  It then creates a new temporary file on the computer, copies over the history from `repl_history_file` and assigns the `JULIA_HISTORY` environment variable to it.  This makes the REPL use the new temporary file as its history file, while retaining all previous history.  It also means that Diary.jl will break if `JULIA_HISTORY` is changed during an active session.
+
+A background task is then created, which monitors the temporary file for file changes.  Any new lines added to it are copied into `repl_history_file`, which ensures that history will persist across sessions, and not be lost due to the temporary nature of the temporary file.  After copying the lines over, they are subsequently parsed by Diary.jl.  The parser ignores lines that are not typed into the main Julia REPL (i.e., the help, package or other modes) and then does some very light formatting.  If the lines are diary command comments, the associated commands are executed, and otherwise they are inserted into the diary file.
+
+At every change, the configuration is loaded and the location of the diary file is determined.  This enables dynamic updates of both the configuration and file location, and the incurred overhead should be negligible.  If the diary file location has changed, a flag is set to write a header into the new diary file with author name and timestamp according to the active configuration.
