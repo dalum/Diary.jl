@@ -197,7 +197,7 @@ end
         print(io, "\n")
     end
     # Allow the `watch_task` to update the diary file.
-    file_event = FileWatching.watch_file(diary_file, 1)
+    file_event = FileWatching.watch_file(diary_file, 5)
     @test file_event.changed || file_event.timedout
     @test readlines(diary_file) == ["# Test: ", "", "a = rand(100)"]
 
@@ -213,7 +213,7 @@ end
         print(io, "\n")
     end
     # Allow the `watch_task` to update the diary file.
-    file_event = FileWatching.watch_file(diary_file, 1)
+    file_event = FileWatching.watch_file(diary_file, 5)
     @test file_event.timedout
     @test readlines(diary_file) == ["# Test: ", "", "a = rand(100)"]
 
