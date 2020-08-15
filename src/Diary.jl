@@ -19,9 +19,10 @@ struct TaskThunk
 end
 @noinline (thunk::TaskThunk)() = thunk.f(thunk.args...)
 
-function __init__()
-    # Only run the watcher if we are running in interactive mode.
-    !isinteractive() && return nothing
+function __init__(; enabled=isinteractive())
+    # Only run the watcher if we are running in interactive mode, or `__init__` is
+    # explicitly called with `enabled=true`.
+    !enabled && return nothing
     # Locate the current history file used by the REPL, so we can keep it updated.
     repl_history_file = REPL.find_hist_file()
     # Create a new, temporary history file that we track.  This protects our diary from

@@ -126,9 +126,7 @@ end
     @test readline(diary_file) == "# Test: "
 
     # Clean-up
-    open(diary_file, write=true) do io
-        print(io, "")
-    end
+    rm(diary_file)
 end
 
 @testset "Committing" begin
@@ -163,6 +161,42 @@ end
         "",
     ]
     @test readlines(Diary.find_diary(; configuration)) == expected_output
+    # Clean-up
+    rm(diary_file)
+end
+
+@testset "Interactivity" begin
+    Pkg.activate()
+    # Re-initialise Diary, enabling the watcher.
+    ENV["JULIA_HISTORY"] = tempname()
+    touch(ENV["JULIA_HISTORY"])
+    Diary.__init__(enabled=true)
+    # Locate relevant files.
+    history_file = ENV["JULIA_HISTORY"]
+    diary_file = Diary.find_diary()
+    configuration_file = joinpath(dirname(Pkg.project().path), "Diary.toml")
+    # Write the configuration.
+    open(configuration_file, write=true) do io
+        join(io, ["author = \"Test\"", "date_format = \"\""], "\n")
+        print(io, "\n")
+    end
+    # Simulate user interaction by writing lines to the history file.
+    history_lines = [
+        "# time: ***",
+        "# mode: julia",
+	"\ta = rand(100);",
+    ]
+    open(history_file, read=true, write=true) do io
+        seekend(io)
+        join(io, history_lines, "\n")
+        print(io, "\n")
+    end
+    # Allow the watch task to update the diary file.
+    sleep(0.1)
+
+    @test readlines(diary_file) == ["# Test: ", "", "a = rand(100)"]
+    # Clean-up
+    rm(diary_file)
 end
 
 end # module
