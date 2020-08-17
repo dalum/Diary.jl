@@ -67,8 +67,10 @@ function watch_task(history_file, repl_history_file=nothing)
             if file_event.changed
                 history_lines = readlines(history_file_handle)
                 @debug "Diary.jl ($history_file): History file has changed:" history_lines
+                # Read user configuration.
+                configuration = read_configuration()
                 # Copy history lines to the REPL history file
-                if !isnothing(repl_history_file)
+                if configuration["persistent_history"] && !isnothing(repl_history_file)
                     open(repl_history_file, read=true, write=true) do io
                         seekend(io)
                         println(io, join(history_lines, '\n'))
@@ -84,8 +86,6 @@ function watch_task(history_file, repl_history_file=nothing)
                     continue
                 end
                 push!(GLOBAL_SEGMENT_BUFFER, diary_lines)
-                # Read user configuration.
-                configuration = read_configuration()
                 # Skip if auto-committing is disabled.
                 !configuration["autocommit"] && continue
                 # Locate the diary file.
@@ -190,7 +190,9 @@ function find_diary(; configuration=read_configuration())
     end
     # Create the diary file if missing.
     !isfile(diary_file) && touch(diary_file)
-
+    # Allow task switching by sleeping for 1 ms.  Necessary for the tests to pass.
+    # Shouldn't affect normal usage.
+    sleep(0.001)
     return diary_file
 end
 
@@ -233,13 +235,14 @@ Return the default configuration.
 function default_configuration()
     return Dict{String,Any}(
         "author" => "",
-        "diary_name" => "diary.jl",
-        "date_format" => "E U d HH:MM",
         "autocommit" => true,
-        "directory_mode" => false,
         "blacklist" => [
-           joinpath(ENV["HOME"], ".julia", "environments"),
-        ]
+            joinpath(ENV["HOME"], ".julia", "environments"),
+        ],
+        "date_format" => "E U d HH:MM",
+        "diary_name" => "diary.jl",
+        "directory_mode" => false,
+        "persistent_history" => true,
     )
 end
 

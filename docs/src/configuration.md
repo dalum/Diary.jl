@@ -5,16 +5,18 @@ Configuration of Diary.jl is done through `Diary.toml` files.  A global configur
 An example `Diary.toml` file looks like the following:
 ```toml
 author = "Anna"
+autocommit = true
+blacklist = ["/home/anna/.julia/environments"]
 date_format = "E U d HH:MM"
 diary_name = "diary.jl"
-autocommit = true
 directory_mode = false
-blacklist = ["/home/anna/.julia/environments"]
 ```
 If a field is not set, it will be set to a default value.
 
-- The `author` and `date_format` fields affect the header written in diary files and default to `""` and `"E U d HH:MM"` respectively.  For a full list of date formatting options, consult the documentation for `Dates.format`.
-- `diary_file` specifies the name to be used for the diary file and defaults to `"diary.jl"`.
-- `autocommit` defaults to `true`.  If set to `false`, the diary file will not be automatically updated with the most recent history file changes.  Instead, changes must be manually committed by using the diary command comment syntax, `# diary: commit [n]` to commit the `n` most recent code blocks.
-- `directory_mode` defaults to `false`.  If set to `true`, the root folder of the diary file is set to the current working directory, rather than the project directory.
-- `blacklist` is a list of patterns that will disable Diary.jl, for projects that match them.  By default, the list is set to `["$HOME/.julia/environments"]`.  Set this to an empty vector to enable Diary.jl for all projects.
+- `author`: defaults to `""`.  Written as part of the comment header to the diary file at the start of every session.
+- `autocommit`: defaults to `true`.  If set to `false`, the diary file will not be automatically updated with the most recent history file changes.  Instead, changes must be manually committed by using the diary command comment syntax, `# diary: commit [n]` to commit the `n` most recent code blocks.
+- `blacklist`: defaults to `["$HOME/.julia/environments"]`.  `blacklist` is a list of patterns that will disable Diary.jl, if a name or part of the path to a project matches it.  Set this to an empty vector to enable Diary.jl for all projects.
+- `date_format`: defaults to `"E U d HH:MM"`.  The format of the date that is written to the comment header at the start of every session.  For a full list of date formatting options, see the documentation for `Dates.format`.
+- `diary_file`: defaults to `diary.jl`.  Specifies the name to be used for the diary file.
+- `directory_mode`: defaults to `false`.  If set to `true`, the root folder of the diary file is set to the current working directory, rather than the project directory.
+- `persistent_history`: defaults to `true`.  If set to `false`, the REPL history will not be saved for future sessions.  This option does not affect the diary file.

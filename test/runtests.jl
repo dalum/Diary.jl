@@ -54,13 +54,14 @@ end
     Pkg.activate()
     default_configuration = Dict{String,Any}(
         "author" => "",
-        "diary_name" => "diary.jl",
-        "date_format" => "E U d HH:MM",
         "autocommit" => true,
-        "directory_mode" => false,
         "blacklist" => [
-           joinpath(ENV["HOME"], ".julia", "environments"),
-        ]
+            joinpath(ENV["HOME"], ".julia", "environments"),
+        ],
+        "date_format" => "E U d HH:MM",
+        "diary_name" => "diary.jl",
+        "directory_mode" => false,
+        "persistent_history" => true,
     )
 
     ENV["JULIA_DIARY_CONFIG"] = tempname()
@@ -171,6 +172,7 @@ end
     # Re-initialise Diary, enabling the watcher.
     ENV["JULIA_HISTORY"] = tempname()
     touch(ENV["JULIA_HISTORY"])
+    repl_history_file = ENV["JULIA_HISTORY"]
     Diary.__init__(enabled=true)
     # Locate relevant files.
     history_file = ENV["JULIA_HISTORY"]
@@ -200,6 +202,7 @@ end
     file_event = FileWatching.watch_file(diary_file, 5)
     @test file_event.changed || file_event.timedout
     @test readlines(diary_file) == ["# Test: ", "", "a = rand(100)"]
+    @test readlines(repl_history_file) == history_lines
 
     # Add line with incorrect syntax and check that it does not update the diary file.
     history_lines = [
@@ -216,6 +219,32 @@ end
     file_event = FileWatching.watch_file(diary_file, 5)
     @test file_event.timedout
     @test readlines(diary_file) == ["# Test: ", "", "a = rand(100)"]
+
+    @testset "Non-persistent history" begin
+        previous_history_lines = readlines(repl_history_file)
+
+        open(configuration_file, write=true) do io
+            configuration = [
+                "author = \"Test\"",
+                "date_format = \"\"",
+                "persistent_history = false"
+            ]
+            join(io, configuration, "\n")
+            print(io, "\n")
+        end
+        # Simulate user interaction by writing lines to the history file.
+        open(history_file, read=true, write=true) do io
+            seekend(io)
+            join(io, ["# time: ***", "# mode: julia", "\tb = 42"], "\n")
+            print(io, "\n")
+        end
+        # Allow the `watch_task` to update the diary file.
+        file_event = FileWatching.watch_file(diary_file, 5)
+        @test file_event.changed || file_event.timedout
+        @test readlines(diary_file) == ["# Test: ", "", "a = rand(100)", "b = 42"]
+        # Test that the original history file hasn't changed.
+        @test readlines(repl_history_file) == previous_history_lines
+    end
 
     # Clean-up
     rm(diary_file)
