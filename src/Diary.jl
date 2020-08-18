@@ -374,6 +374,8 @@ end
 """
     erase_diary(; kwargs...)
 
+Erase the contents of the current diary.  This function does not remove the file.
+
 # Keyword arguments
 - `configuration`: (default: `read_configuration()`)
 - `diary_file`: (default: `find_diary(; configuration)`)

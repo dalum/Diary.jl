@@ -11,5 +11,6 @@ Diary.find_configuration_file
 Diary.default_configuration
 Diary.commit
 Diary.write_header
+Diary.erase_diary
 Diary.TaskThunk
 ```
