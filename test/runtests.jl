@@ -39,11 +39,15 @@ end
 
 @testset "Command Parsing" begin
     cmd = "commit"
-    @test Diary.parse_command(cmd) == 0
+    @test Diary.parse_command(cmd) === 0
     cmd = "commit 1"
-    @test Diary.parse_command(cmd) == 0
+    @test Diary.parse_command(cmd) === 0
     cmd = "commit 1 2"
     @test_logs (:error, "Diary.jl: too many arguments to `commit`: 2, expected 1") Diary.parse_command(cmd)
+    cmd = "erase"
+    @test Diary.parse_command(cmd) === true
+    cmd = "erase diary"
+    @test_logs (:error, "Diary.jl: too many arguments to `erase`: 1, expected 0") Diary.parse_command(cmd)
     cmd = "unsupported command"
     @test_logs (:error, "Diary.jl: could not parse command: $cmd") Diary.parse_command(cmd)
 end
@@ -316,15 +320,15 @@ end
             join(io, configuration, "\n")
             print(io, "\n")
         end
-        # Trigger a configuration refresh to make the task switch to polling.
+        # Trigger a configuration refresh to make the task switch to polling, and erase the
+        # diary.
         open(history_file, read=true, write=true) do io
             seekend(io)
-            join(io, ["# time: ***", "# mode: julia", "\tb = 42"], "\n")
+            join(io, ["# time: ***", "# mode: julia", "\t# diary: erase"], "\n")
             print(io, "\n")
         end
         # Allow the diary to synchronise before wiping it.
         sleep(5)
-        Diary.erase_diary()
         # Write the actual history lines we want to check up against.
         open(history_file, read=true, write=true) do io
             seekend(io)

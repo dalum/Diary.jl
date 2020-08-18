@@ -177,6 +177,9 @@ function parse_command(cmd)
         length(args) == 1 && return commit()
         length(args) == 2 && return commit(parse(Int, args[2]))
         @error("Diary.jl: too many arguments to `commit`: $(length(args) - 1), expected 1")
+    elseif args[1] == "erase"
+        length(args) == 1 && return erase_diary()
+        @error("Diary.jl: too many arguments to `erase`: $(length(args) - 1), expected 0")
     else
         @error("Diary.jl: could not parse command: $cmd")
     end
@@ -320,7 +323,7 @@ function commit(
     isnothing(diary_file) && return 0
     # Prevent committing more lines than are in the buffer.
     n = min(n, length(GLOBAL_SEGMENT_BUFFER))
-    @debug "Diary.jl: committing $n lines to $diary_file"
+    @debug "Diary.jl: committing $n line$(n > 1 ? "s" : "") to: $diary_file"
     # Update the diary file.
     open(diary_file, read=true, write=true) do io
         # Get the last line in the diary file.
@@ -380,9 +383,10 @@ function erase_diary(
     configuration = read_configuration(),
     diary_file = find_diary(; configuration=configuration),
 )
-    open(diary_file, write=true) do io
+    isfile(diary_file) && open(diary_file, write=true) do io
         print(io, "")
     end
+    return true
 end
 
 end # module
