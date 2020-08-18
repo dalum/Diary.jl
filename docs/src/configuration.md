@@ -20,4 +20,6 @@ If a field is not set, it will be set to a default value.
 - `date_format`: defaults to `"E U d HH:MM"`.  The format of the date that is written to the comment header at the start of every session.  For a full list of date formatting options, see the documentation for `Dates.format`.
 - `diary_file`: defaults to `"diary.jl"`.  Specifies the path to be used for the diary file, relative to the root directory.
 - `directory_mode`: defaults to `false`.  If set to `true`, the root folder of the diary file is set to the current working directory, rather than the project directory.
+- `file_polling`: defaults to `false`.  If set to `true`, use `FileWatching.file_poll` instead of `FileWatching.watch_file` to check for changes to the history file.  This method is less robust and thus not used by default, but if `FileWatching.watch_file` does not work, setting this to true may be the best option.
+- `file_polling_interval`: defaults to `1.0` seconds.  If `file_polling` is set to `true`, this configures the polling interval passed to `FileWatching.file_poll`.  Otherwise, this option has no effect.
 - `persistent_history`: defaults to `true`.  If set to `false`, the REPL history will not be saved for future sessions.  This option does not affect the diary file.

@@ -57,17 +57,35 @@ function watch_task(history_file, repl_history_file=nothing)
     history_file_handle = open(history_file)
     try
         watching = true
+        # Read user configuration.
+        configuration = read_configuration()
         # Flush lines to get to the end of the history file, so we only track new changes.
         readlines(history_file_handle)
         # We set the diary file to `nothing` outside the loop so we can keep track of the
         # file location and whether it changes while the task is running.
         previous_diary_file = nothing
         while watching
-            file_event = FileWatching.watch_file(history_file)
-            if file_event.changed
+            # `watch_file` is generally preferable to `poll_file`, but on some systems and
+            # in some cases, it may be required for compatibility, so we provide an option
+            # to toggle between the two methods.
+            if configuration["file_polling"]
+                previous, current = FileWatching.poll_file(
+                    history_file,
+                    configuration["file_polling_interval"]
+                )
+                has_changed = (
+                    current isa FileWatching.StatStruct &&
+                    mtime(previous) != mtime(current)
+                )
+            else
+                file_event = FileWatching.watch_file(history_file)
+                has_changed = file_event.changed
+            end
+
+            if has_changed
                 history_lines = readlines(history_file_handle)
                 @debug "Diary.jl ($history_file): History file has changed:" history_lines
-                # Read user configuration.
+                # Update user configuration.
                 configuration = read_configuration()
                 # Copy history lines to the REPL history file
                 if configuration["persistent_history"] && !isnothing(repl_history_file)
@@ -229,7 +247,15 @@ Read the configuration from `filename`.  See also [`find_configuration_file`](@r
 function read_configuration(filename=find_configuration_file())
     configuration = default_configuration()
     (isnothing(filename) || !isfile(filename)) && return configuration
-    return merge!(configuration, Pkg.TOML.parsefile(filename))
+    try
+        return merge!(configuration, Pkg.TOML.parsefile(filename))
+    catch e
+        @warn(
+            "Diary.jl: an error occured while parsing configuration file: $filename",
+            exception=(e, catch_backtrace()),
+        )
+        return configuration
+    end
 end
 
 """
@@ -268,6 +294,8 @@ function default_configuration()
         "date_format" => "E U d HH:MM",
         "diary_name" => "diary.jl",
         "directory_mode" => false,
+        "file_polling" => false,
+        "file_polling_interval" => 1.0,
         "persistent_history" => true,
     )
 end
@@ -338,6 +366,23 @@ function write_header(io; configuration=read_configuration())
     print(io, "# ", author, ": ", date, '\n')
     print(io, '\n')
     return io
+end
+
+"""
+    erase_diary(; kwargs...)
+
+# Keyword arguments
+- `configuration`: (default: `read_configuration()`)
+- `diary_file`: (default: `find_diary(; configuration)`)
+"""
+function erase_diary(
+    ;
+    configuration = read_configuration(),
+    diary_file = find_diary(; configuration=configuration),
+)
+    open(diary_file, write=true) do io
+        print(io, "")
+    end
 end
 
 end # module
