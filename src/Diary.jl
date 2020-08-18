@@ -89,7 +89,7 @@ function watch_task(history_file, repl_history_file=nothing)
                 # Skip if auto-committing is disabled.
                 !configuration["autocommit"] && continue
                 # Locate the diary file.
-                diary_file = find_diary(; configuration)
+                diary_file = find_diary(; configuration=configuration)
                 # Skip if a suitable diary file could not be found.
                 isnothing(diary_file) && continue
                 # Write a new header, if the diary file has changed, i.e., if we switched
@@ -97,7 +97,12 @@ function watch_task(history_file, repl_history_file=nothing)
                 with_header = previous_diary_file != diary_file
                 previous_diary_file = diary_file
                 # Commit the latest segment.
-                commit(1; configuration, diary_file, with_header)
+                commit(
+                    1;
+                    configuration=configuration,
+                    diary_file=diary_file,
+                    with_header=with_header
+                )
             end
         end
     catch e
@@ -280,7 +285,7 @@ Commit the `n` latest recorded lines to the diary file.
 function commit(
     n = length(GLOBAL_SEGMENT_BUFFER);
     configuration = read_configuration(),
-    diary_file = find_diary(; configuration),
+    diary_file = find_diary(; configuration=configuration),
     with_header = true,
 )
     # If the diary file could not be found, no lines were written
@@ -298,7 +303,7 @@ function commit(
                 # Insert an extra newline before the header, if the previous line exists and
                 # contains non-whitespace characters.
                 !all(isspace, last_diary_line) && print(io, '\n')
-                write_header(io; configuration)
+                write_header(io; configuration=configuration)
                 with_header = false
             elseif (
                 length(segment) > 1

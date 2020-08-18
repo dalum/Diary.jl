@@ -118,9 +118,9 @@ end
             ),
         )
 
-        diary_file_path = Diary.find_diary_path(; configuration)
+        diary_file_path = Diary.find_diary_path(; configuration=configuration)
         rm(diary_file_path, force=true)
-        @test isnothing(Diary.find_diary(; configuration))
+        @test isnothing(Diary.find_diary(; configuration=configuration))
     end
 
     @testset "Directory mode" begin
@@ -136,7 +136,7 @@ end
         directory = mktempdir(dirname(Pkg.project().path))
         expected_dir = abspath(joinpath(directory, "diary.jl"))
         cd(directory) do
-            @test Diary.find_diary(; configuration) == expected_dir
+            @test Diary.find_diary(; configuration=configuration) == expected_dir
         end
     end
 end
@@ -154,7 +154,7 @@ end
 
     diary_file = Diary.find_diary()
     open(diary_file, write=true) do io
-        Diary.write_header(io; configuration)
+        Diary.write_header(io; configuration=configuration)
     end
 
     @test readline(diary_file) == "# Test: "
@@ -176,15 +176,15 @@ end
 
     push!(Diary.GLOBAL_SEGMENT_BUFFER, ["a = rand(100)"])
 
-    diary_file = Diary.find_diary(; configuration)
-    Diary.commit(; diary_file, configuration)
+    diary_file = Diary.find_diary(; configuration=configuration)
+    Diary.commit(; diary_file=diary_file, configuration=configuration)
 
-    @test readlines(Diary.find_diary(; configuration)) == ["# Test: ", "", "a = rand(100)"]
+    @test readlines(Diary.find_diary(; configuration=configuration)) == ["# Test: ", "", "a = rand(100)"]
 
     push!(Diary.GLOBAL_SEGMENT_BUFFER, ["function f(x)", "    return x^2", "end"])
 
-    diary_file = Diary.find_diary(; configuration)
-    Diary.commit(; diary_file, configuration, with_header=false)
+    diary_file = Diary.find_diary(; configuration=configuration)
+    Diary.commit(; diary_file=diary_file, configuration=configuration, with_header=false)
 
     expected_output = [
         "# Test: ",
@@ -196,7 +196,7 @@ end
         "end",
         "",
     ]
-    @test readlines(Diary.find_diary(; configuration)) == expected_output
+    @test readlines(Diary.find_diary(; configuration=configuration)) == expected_output
     # Clean-up
     rm(diary_file)
 end
