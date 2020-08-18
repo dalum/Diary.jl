@@ -172,7 +172,7 @@ If the configuration option, `create_if_missing` is `true`, this function will c
 file.  See also [`read_configuration()`](@ref) and [`find_diary_path()`](@ref).
 """
 function find_diary(; configuration=read_configuration())
-    diary_file = find_diary_path(; configuration)
+    diary_file = find_diary_path(; configuration=configuration)
     # If `JULIA_DIARY` is not explicitly set, filter out blacklisted diary files.
     if !haskey(ENV, "JULIA_DIARY")
         if any(needle -> contains(diary_file, needle), configuration["blacklist"])
