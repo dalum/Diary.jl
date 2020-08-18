@@ -39,11 +39,15 @@ end
 
 @testset "Command Parsing" begin
     cmd = "commit"
-    @test Diary.parse_command(cmd) == 0
+    @test Diary.parse_command(cmd) === 0
     cmd = "commit 1"
-    @test Diary.parse_command(cmd) == 0
+    @test Diary.parse_command(cmd) === 0
     cmd = "commit 1 2"
     @test_logs (:error, "Diary.jl: too many arguments to `commit`: 2, expected 1") Diary.parse_command(cmd)
+    cmd = "erase"
+    @test Diary.parse_command(cmd) === true
+    cmd = "erase diary"
+    @test_logs (:error, "Diary.jl: too many arguments to `erase`: 1, expected 0") Diary.parse_command(cmd)
     cmd = "unsupported command"
     @test_logs (:error, "Diary.jl: could not parse command: $cmd") Diary.parse_command(cmd)
 end
@@ -62,6 +66,8 @@ end
         "date_format" => "E U d HH:MM",
         "diary_name" => "diary.jl",
         "directory_mode" => false,
+        "file_polling" => false,
+        "file_polling_interval" => 1.0,
         "persistent_history" => true,
     )
 
@@ -81,6 +87,24 @@ end
         println(io, "author = \"Test\"")
     end
     @test Diary.read_configuration()["author"] == "Test"
+
+    open(configuration_file, write=true) do io
+        println(io, "12 34")
+    end
+
+    @test_logs(
+        (
+            :warn,
+            string(
+                "Diary.jl: an error occured while parsing configuration file: ",
+                configuration_file,
+            )
+        ),
+        Diary.read_configuration(),
+    )
+
+    # Clean-up
+    rm(configuration_file)
 end
 
 @testset "Finding Diary" begin
@@ -105,7 +129,7 @@ end
     @testset "Blacklist" begin
         # Test that the default environment is blacklisted by default.
         Pkg.activate("v$(VERSION.major).$(VERSION.minor)"; shared=true)
-        @test isnothing(Diary.find_diary())
+        @test isnothing(Diary.find_diary(; configuration=Diary.default_configuration()))
     end
 
     @testset "Create missing" begin
@@ -118,9 +142,9 @@ end
             ),
         )
 
-        diary_file_path = Diary.find_diary_path(; configuration)
+        diary_file_path = Diary.find_diary_path(; configuration=configuration)
         rm(diary_file_path, force=true)
-        @test isnothing(Diary.find_diary(; configuration))
+        @test isnothing(Diary.find_diary(; configuration=configuration))
     end
 
     @testset "Directory mode" begin
@@ -136,7 +160,7 @@ end
         directory = mktempdir(dirname(Pkg.project().path))
         expected_dir = abspath(joinpath(directory, "diary.jl"))
         cd(directory) do
-            @test Diary.find_diary(; configuration) == expected_dir
+            @test Diary.find_diary(; configuration=configuration) == expected_dir
         end
     end
 end
@@ -154,7 +178,7 @@ end
 
     diary_file = Diary.find_diary()
     open(diary_file, write=true) do io
-        Diary.write_header(io; configuration)
+        Diary.write_header(io; configuration=configuration)
     end
 
     @test readline(diary_file) == "# Test: "
@@ -176,15 +200,15 @@ end
 
     push!(Diary.GLOBAL_SEGMENT_BUFFER, ["a = rand(100)"])
 
-    diary_file = Diary.find_diary(; configuration)
-    Diary.commit(; diary_file, configuration)
+    diary_file = Diary.find_diary(; configuration=configuration)
+    Diary.commit(; diary_file=diary_file, configuration=configuration)
 
-    @test readlines(Diary.find_diary(; configuration)) == ["# Test: ", "", "a = rand(100)"]
+    @test readlines(Diary.find_diary(; configuration=configuration)) == ["# Test: ", "", "a = rand(100)"]
 
     push!(Diary.GLOBAL_SEGMENT_BUFFER, ["function f(x)", "    return x^2", "end"])
 
-    diary_file = Diary.find_diary(; configuration)
-    Diary.commit(; diary_file, configuration, with_header=false)
+    diary_file = Diary.find_diary(; configuration=configuration)
+    Diary.commit(; diary_file=diary_file, configuration=configuration, with_header=false)
 
     expected_output = [
         "# Test: ",
@@ -196,7 +220,13 @@ end
         "end",
         "",
     ]
-    @test readlines(Diary.find_diary(; configuration)) == expected_output
+    @test readlines(Diary.find_diary(; configuration=configuration)) == expected_output
+
+    @testset "Erasing" begin
+        Diary.erase_diary(; diary_file=diary_file, configuration=configuration)
+        @test readlines(Diary.find_diary(; configuration=configuration)) == []
+    end
+
     # Clean-up
     rm(diary_file)
 end
@@ -210,13 +240,13 @@ end
     Diary.__init__(enabled=true)
     # Locate relevant files.
     history_file = ENV["JULIA_HISTORY"]
-    diary_file = Diary.find_diary()
     configuration_file = joinpath(dirname(Pkg.project().path), "Diary.toml")
     # Write the configuration.
     open(configuration_file, write=true) do io
         join(io, ["author = \"Test\"", "date_format = \"\""], "\n")
         print(io, "\n")
     end
+    diary_file = Diary.find_diary()
 
     @test Diary.read_configuration()["author"] == "Test"
     @test Diary.read_configuration()["date_format"] == ""
@@ -261,7 +291,7 @@ end
             configuration = [
                 "author = \"Test\"",
                 "date_format = \"\"",
-                "persistent_history = false"
+                "persistent_history = false",
             ]
             join(io, configuration, "\n")
             print(io, "\n")
@@ -280,7 +310,38 @@ end
         @test readlines(repl_history_file) == previous_history_lines
     end
 
+    @testset "File polling" begin
+        open(configuration_file, write=true) do io
+            configuration = [
+                "author = \"Test\"",
+                "date_format = \"\"",
+                "file_polling = true",
+            ]
+            join(io, configuration, "\n")
+            print(io, "\n")
+        end
+        # Trigger a configuration refresh to make the task switch to polling, and erase the
+        # diary.
+        open(history_file, read=true, write=true) do io
+            seekend(io)
+            join(io, ["# time: ***", "# mode: julia", "\t# diary: erase"], "\n")
+            print(io, "\n")
+        end
+        # Allow the diary to synchronise before wiping it.
+        sleep(5)
+        # Write the actual history lines we want to check up against.
+        open(history_file, read=true, write=true) do io
+            seekend(io)
+            join(io, ["# time: ***", "# mode: julia", "\tc = 13"], "\n")
+            print(io, "\n")
+        end
+        file_event = FileWatching.watch_file(diary_file, 5)
+        @test file_event.changed || file_event.timedout
+        @test readlines(diary_file) == ["c = 13"]
+    end
+
     # Clean-up
+    rm(configuration_file)
     rm(diary_file)
 end
 

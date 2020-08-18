@@ -57,17 +57,35 @@ function watch_task(history_file, repl_history_file=nothing)
     history_file_handle = open(history_file)
     try
         watching = true
+        # Read user configuration.
+        configuration = read_configuration()
         # Flush lines to get to the end of the history file, so we only track new changes.
         readlines(history_file_handle)
         # We set the diary file to `nothing` outside the loop so we can keep track of the
         # file location and whether it changes while the task is running.
         previous_diary_file = nothing
         while watching
-            file_event = FileWatching.watch_file(history_file)
-            if file_event.changed
+            # `watch_file` is generally preferable to `poll_file`, but on some systems and
+            # in some cases, it may be required for compatibility, so we provide an option
+            # to toggle between the two methods.
+            if configuration["file_polling"]
+                previous, current = FileWatching.poll_file(
+                    history_file,
+                    configuration["file_polling_interval"]
+                )
+                has_changed = (
+                    current isa FileWatching.StatStruct &&
+                    mtime(previous) != mtime(current)
+                )
+            else
+                file_event = FileWatching.watch_file(history_file)
+                has_changed = file_event.changed
+            end
+
+            if has_changed
                 history_lines = readlines(history_file_handle)
                 @debug "Diary.jl ($history_file): History file has changed:" history_lines
-                # Read user configuration.
+                # Update user configuration.
                 configuration = read_configuration()
                 # Copy history lines to the REPL history file
                 if configuration["persistent_history"] && !isnothing(repl_history_file)
@@ -89,7 +107,7 @@ function watch_task(history_file, repl_history_file=nothing)
                 # Skip if auto-committing is disabled.
                 !configuration["autocommit"] && continue
                 # Locate the diary file.
-                diary_file = find_diary(; configuration)
+                diary_file = find_diary(; configuration=configuration)
                 # Skip if a suitable diary file could not be found.
                 isnothing(diary_file) && continue
                 # Write a new header, if the diary file has changed, i.e., if we switched
@@ -97,7 +115,12 @@ function watch_task(history_file, repl_history_file=nothing)
                 with_header = previous_diary_file != diary_file
                 previous_diary_file = diary_file
                 # Commit the latest segment.
-                commit(1; configuration, diary_file, with_header)
+                commit(
+                    1;
+                    configuration=configuration,
+                    diary_file=diary_file,
+                    with_header=with_header
+                )
             end
         end
     catch e
@@ -154,6 +177,9 @@ function parse_command(cmd)
         length(args) == 1 && return commit()
         length(args) == 2 && return commit(parse(Int, args[2]))
         @error("Diary.jl: too many arguments to `commit`: $(length(args) - 1), expected 1")
+    elseif args[1] == "erase"
+        length(args) == 1 && return erase_diary()
+        @error("Diary.jl: too many arguments to `erase`: $(length(args) - 1), expected 0")
     else
         @error("Diary.jl: could not parse command: $cmd")
     end
@@ -167,10 +193,10 @@ If the configuration option, `create_if_missing` is `true`, this function will c
 file.  See also [`read_configuration()`](@ref) and [`find_diary_path()`](@ref).
 """
 function find_diary(; configuration=read_configuration())
-    diary_file = find_diary_path(; configuration)
+    diary_file = find_diary_path(; configuration=configuration)
     # If `JULIA_DIARY` is not explicitly set, filter out blacklisted diary files.
     if !haskey(ENV, "JULIA_DIARY")
-        if any(needle -> contains(diary_file, needle), configuration["blacklist"])
+        if any(needle -> occursin(needle, diary_file), configuration["blacklist"])
             @debug "Diary.jl: $diary_file is blacklisted"
             return nothing
         end
@@ -224,7 +250,15 @@ Read the configuration from `filename`.  See also [`find_configuration_file`](@r
 function read_configuration(filename=find_configuration_file())
     configuration = default_configuration()
     (isnothing(filename) || !isfile(filename)) && return configuration
-    return merge!(configuration, Pkg.TOML.parsefile(filename))
+    try
+        return merge!(configuration, Pkg.TOML.parsefile(filename))
+    catch e
+        @warn(
+            "Diary.jl: an error occured while parsing configuration file: $filename",
+            exception=(e, catch_backtrace()),
+        )
+        return configuration
+    end
 end
 
 """
@@ -263,6 +297,8 @@ function default_configuration()
         "date_format" => "E U d HH:MM",
         "diary_name" => "diary.jl",
         "directory_mode" => false,
+        "file_polling" => false,
+        "file_polling_interval" => 1.0,
         "persistent_history" => true,
     )
 end
@@ -280,14 +316,14 @@ Commit the `n` latest recorded lines to the diary file.
 function commit(
     n = length(GLOBAL_SEGMENT_BUFFER);
     configuration = read_configuration(),
-    diary_file = find_diary(; configuration),
+    diary_file = find_diary(; configuration=configuration),
     with_header = true,
 )
     # If the diary file could not be found, no lines were written
     isnothing(diary_file) && return 0
     # Prevent committing more lines than are in the buffer.
     n = min(n, length(GLOBAL_SEGMENT_BUFFER))
-    @debug "Diary.jl: committing $n lines to $diary_file"
+    @debug "Diary.jl: committing $n line$(n > 1 ? "s" : "") to: $diary_file"
     # Update the diary file.
     open(diary_file, read=true, write=true) do io
         # Get the last line in the diary file.
@@ -298,7 +334,7 @@ function commit(
                 # Insert an extra newline before the header, if the previous line exists and
                 # contains non-whitespace characters.
                 !all(isspace, last_diary_line) && print(io, '\n')
-                write_header(io; configuration)
+                write_header(io; configuration=configuration)
                 with_header = false
             elseif (
                 length(segment) > 1
@@ -333,6 +369,24 @@ function write_header(io; configuration=read_configuration())
     print(io, "# ", author, ": ", date, '\n')
     print(io, '\n')
     return io
+end
+
+"""
+    erase_diary(; kwargs...)
+
+# Keyword arguments
+- `configuration`: (default: `read_configuration()`)
+- `diary_file`: (default: `find_diary(; configuration)`)
+"""
+function erase_diary(
+    ;
+    configuration = read_configuration(),
+    diary_file = find_diary(; configuration=configuration),
+)
+    isfile(diary_file) && open(diary_file, write=true) do io
+        print(io, "")
+    end
+    return true
 end
 
 end # module
