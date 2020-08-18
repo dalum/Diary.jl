@@ -175,7 +175,7 @@ function find_diary(; configuration=read_configuration())
     diary_file = find_diary_path(; configuration=configuration)
     # If `JULIA_DIARY` is not explicitly set, filter out blacklisted diary files.
     if !haskey(ENV, "JULIA_DIARY")
-        if any(needle -> contains(diary_file, needle), configuration["blacklist"])
+        if any(needle -> occursin(needle, diary_file), configuration["blacklist"])
             @debug "Diary.jl: $diary_file is blacklisted"
             return nothing
         end
