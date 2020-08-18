@@ -58,6 +58,7 @@ end
         "blacklist" => [
             joinpath(ENV["HOME"], ".julia", "environments"),
         ],
+        "create_if_missing" => true,
         "date_format" => "E U d HH:MM",
         "diary_name" => "diary.jl",
         "directory_mode" => false,
@@ -83,43 +84,74 @@ end
 end
 
 @testset "Finding Diary" begin
-    Pkg.activate()
-    default_path = joinpath(
-        dirname(Pkg.project().path),
-        "diary.jl",
-    )
-    @test Diary.find_diary() == default_path
-    @test isfile(default_path)
+    @testset "Basic functionality" begin
+        Pkg.activate()
+        default_path = joinpath(
+            dirname(Pkg.project().path),
+            "diary.jl",
+        )
+        @test Diary.find_diary() == default_path
+        @test isfile(default_path)
+    end
 
-    env_path = joinpath(dirname(Pkg.project().path), "env_diary.jl")
-    ENV["JULIA_DIARY"] = env_path
-    @test Diary.find_diary() == env_path
-    @test isfile(env_path)
-    delete!(ENV, "JULIA_DIARY")
+    @testset "Environment variable" begin
+        env_path = joinpath(dirname(Pkg.project().path), "env_diary.jl")
+        ENV["JULIA_DIARY"] = env_path
+        @test Diary.find_diary() == env_path
+        @test isfile(env_path)
+        delete!(ENV, "JULIA_DIARY")
+    end
 
-    # Test that the default environment is blacklisted by default.
-    Pkg.activate("v$(VERSION.major).$(VERSION.minor)"; shared=true)
-    @test isnothing(Diary.find_diary())
+    @testset "Blacklist" begin
+        # Test that the default environment is blacklisted by default.
+        Pkg.activate("v$(VERSION.major).$(VERSION.minor)"; shared=true)
+        @test isnothing(Diary.find_diary())
+    end
 
-    Pkg.activate()
-    configuration = Dict{String,Any}(
-        "directory_mode" => true,
-        "diary_name" => "diary.jl",
-        "blacklist" => [],
-    )
-    directory = mktempdir(dirname(Pkg.project().path))
-    expected_dir = abspath(joinpath(directory, "diary.jl"))
-    cd(directory) do
-        @test Diary.find_diary(; configuration) == expected_dir
+    @testset "Create missing" begin
+        Pkg.activate()
+
+        configuration = merge!(
+            Diary.default_configuration(),
+            Dict{String,Any}(
+                "create_if_missing" => false,
+            ),
+        )
+
+        diary_file_path = Diary.find_diary_path(; configuration)
+        rm(diary_file_path, force=true)
+        @test isnothing(Diary.find_diary(; configuration))
+    end
+
+    @testset "Directory mode" begin
+        Pkg.activate()
+
+        configuration = merge!(
+            Diary.default_configuration(),
+            Dict{String,Any}(
+                "directory_mode" => true,
+            ),
+        )
+
+        directory = mktempdir(dirname(Pkg.project().path))
+        expected_dir = abspath(joinpath(directory, "diary.jl"))
+        cd(directory) do
+            @test Diary.find_diary(; configuration) == expected_dir
+        end
     end
 end
 
 @testset "Header" begin
     Pkg.activate()
-    configuration = Dict{String,Any}(
-        "author" => "Test",
-        "date_format" => "",
+
+    configuration = merge!(
+        Diary.default_configuration(),
+        Dict{String,Any}(
+            "author" => "Test",
+            "date_format" => "",
+        ),
     )
+
     diary_file = Diary.find_diary()
     open(diary_file, write=true) do io
         Diary.write_header(io; configuration)
@@ -133,13 +165,15 @@ end
 
 @testset "Committing" begin
     Pkg.activate()
-    configuration = Dict{String,Any}(
-        "author" => "Test",
-        "date_format" => "",
-        "diary_name" => "diary.jl",
-        "directory_mode" => false,
-        "blacklist" => [],
+
+    configuration = merge!(
+        Diary.default_configuration(),
+        Dict{String,Any}(
+            "author" => "Test",
+            "date_format" => "",
+        ),
     )
+
     push!(Diary.GLOBAL_SEGMENT_BUFFER, ["a = rand(100)"])
 
     diary_file = Diary.find_diary(; configuration)

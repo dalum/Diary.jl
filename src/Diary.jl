@@ -163,37 +163,57 @@ end
     find_diary(; configuration=read_configuration())
 
 Locate the diary file.  The default diary name and blacklist is read from `configuration`.
-See also [`read_configuration()`](@ref).
+If the configuration option, `create_if_missing` is `true`, this function will create the
+file.  See also [`read_configuration()`](@ref) and [`find_diary_path()`](@ref).
 """
 function find_diary(; configuration=read_configuration())
-    diary_file = get(ENV, "JULIA_DIARY", nothing)
+    diary_file = find_diary_path(; configuration)
+    # If `JULIA_DIARY` is not explicitly set, filter out blacklisted diary files.
+    if !haskey(ENV, "JULIA_DIARY")
+        if any(needle -> contains(diary_file, needle), configuration["blacklist"])
+            @debug "Diary.jl: $diary_file is blacklisted"
+            return nothing
+        end
+    end
+    # Create missing diary files.
+    if !isfile(diary_file)
+        if configuration["create_if_missing"]
+            mkpath(dirname(diary_file))
+            touch(diary_file)
+        else
+            # The user has disabled `create_if_missing`, so we won't do anything.
+            @debug "Diary.jl: `create_if_missing` disabled and $diary_file missing"
+            return nothing
+        end
+    end
+    # Allow task switching by sleeping for 1 ms.  Necessary for the tests to pass. Shouldn't
+    # affect normal usage.
+    sleep(0.001)
+    return diary_file
+end
 
-    if isnothing(diary_file)
+"""
+    find_diary_path(; configuration=read_configuration())
+
+Return the diary file path without creating it.  The default diary name is read from
+`configuration`.  See also [`read_configuration()`](@ref) and [`find_diary()`](@ref).
+"""
+function find_diary_path(; configuration=read_configuration())
+    diary_file_path = get(ENV, "JULIA_DIARY", nothing)
+
+    if isnothing(diary_file_path)
         if configuration["directory_mode"]
             root_directory = pwd()
         else
             root_directory = dirname(Pkg.project().path)
         end
         @debug "Diary.jl: using $root_directory as diary root folder"
-        # Exit early, if the directory is blacklisted.
-        is_blacklisted = any(configuration["blacklist"]) do needle
-            occursin(needle, root_directory)
-        end
-        if is_blacklisted
-            @debug "Diary.jl: $root_directory is blacklisted"
-            return nothing
-        end
-        diary_file = joinpath(root_directory, configuration["diary_name"])
+        diary_file_path = joinpath(root_directory, configuration["diary_name"])
     else
-        @debug "Diary.jl: JULIA_DIARY = $diary_file"
-        diary_file = abspath(diary_file)
+        @debug "Diary.jl: JULIA_DIARY = $diary_file_path"
+        diary_file_path = abspath(diary_file_path)
     end
-    # Create the diary file if missing.
-    !isfile(diary_file) && touch(diary_file)
-    # Allow task switching by sleeping for 1 ms.  Necessary for the tests to pass.
-    # Shouldn't affect normal usage.
-    sleep(0.001)
-    return diary_file
+    return diary_file_path
 end
 
 """
@@ -239,6 +259,7 @@ function default_configuration()
         "blacklist" => [
             joinpath(ENV["HOME"], ".julia", "environments"),
         ],
+        "create_if_missing" => true,
         "date_format" => "E U d HH:MM",
         "diary_name" => "diary.jl",
         "directory_mode" => false,
@@ -274,8 +295,8 @@ function commit(
         last_diary_line = iszero(length(diary_lines)) ? "" : diary_lines[end]
         for segment in GLOBAL_SEGMENT_BUFFER[(end - n + 1):end]
             if with_header
-                # Insert an extra newline before the header, if the previous line
-                # exists and contains non-whitespace characters.
+                # Insert an extra newline before the header, if the previous line exists and
+                # contains non-whitespace characters.
                 !all(isspace, last_diary_line) && print(io, '\n')
                 write_header(io; configuration)
                 with_header = false

@@ -16,6 +16,7 @@ If a field is not set, it will be set to a default value.
 - `author`: defaults to `""`.  Written as part of the comment header to the diary file at the start of every session.
 - `autocommit`: defaults to `true`.  If set to `false`, the diary file will not be automatically updated with the most recent history file changes.  Instead, changes must be manually committed by using the diary command comment syntax, `# diary: commit [n]` to commit the `n` most recent code blocks.
 - `blacklist`: defaults to `["$HOME/.julia/environments"]`.  `blacklist` is a list of patterns that will disable Diary.jl, if a name or part of the path to a project matches it.  Set this to an empty vector to enable Diary.jl for all projects.
+- `create_if_missing`: defaults to `true`.  If set to `false`, the diary file will not be created or written to if missing.
 - `date_format`: defaults to `"E U d HH:MM"`.  The format of the date that is written to the comment header at the start of every session.  For a full list of date formatting options, see the documentation for `Dates.format`.
 - `diary_file`: defaults to `diary.jl`.  Specifies the name to be used for the diary file.
 - `directory_mode`: defaults to `false`.  If set to `true`, the root folder of the diary file is set to the current working directory, rather than the project directory.
