@@ -60,7 +60,7 @@ end
         "author" => "",
         "autocommit" => true,
         "blacklist" => [
-            joinpath(ENV["HOME"], ".julia", "environments"),
+            joinpath(DEPOT_PATH[1], "environments"),
         ],
         "create_if_missing" => true,
         "date_format" => "E U d HH:MM",
