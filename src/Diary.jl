@@ -275,7 +275,7 @@ function find_configuration_file()
     filename = joinpath(environment_directory, "Diary.toml")
     isfile(filename) && return abspath(filename)
     # Fall back to returning `~/.julia/config/Diary.toml`, if it exists.
-    filename = joinpath(ENV["HOME"], ".julia", "config", "Diary.toml")
+    filename = joinpath(DEPOT_PATH[1], "config", "Diary.toml")
     isfile(filename) && return abspath(filename)
     # No configuration file could be found.
     return nothing
@@ -291,7 +291,7 @@ function default_configuration()
         "author" => "",
         "autocommit" => true,
         "blacklist" => [
-            joinpath(ENV["HOME"], ".julia", "environments"),
+            joinpath(DEPOT_PATH[1], "environments"),
         ],
         "create_if_missing" => true,
         "date_format" => "E U d HH:MM",
