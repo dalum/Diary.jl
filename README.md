@@ -22,7 +22,11 @@ atreplinit() do repl
     try
         @eval using Diary
     catch e
-        @warn e
+        @error "Loading Diary.jl:" exception=(e, catch_backtrace())
     end
 end
 ```
+
+## Known issues
+
+If used together with [OhMyREPL](https://github.com/KristofferC/OhMyREPL.jl), Diary.jl must be loaded *after* OhMyREPL.
