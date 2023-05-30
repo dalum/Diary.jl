@@ -10,13 +10,7 @@ If you encounter any problems or have suggestions for how to improve the package
 
 ## Usage
 
-To try out Diary.jl, install it using `]add Diary`. Then,
-```julia
-julia> using Diary
-```
-to get started.
-
-If you want to enable Diary.jl by default, put the following in your `~/.julia/config/startup.jl` file:
+To use Diary.jl, it must be enabled at startup. To do so, put the following in your `~/.julia/config/startup.jl` file:
 ```julia
 atreplinit() do repl
     try
@@ -29,4 +23,5 @@ end
 
 ## Known issues
 
-If used together with [OhMyREPL](https://github.com/KristofferC/OhMyREPL.jl), Diary.jl must be loaded *after* OhMyREPL.
+* Diary.jl only works if loaded at startup. Calling `using Diary` in a running REPL does not work ([#3](https://github.com/dalum/Diary.jl/issues/3)).
+* If used together with [OhMyREPL](https://github.com/KristofferC/OhMyREPL.jl), Diary.jl must be loaded *after* OhMyREPL.
