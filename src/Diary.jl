@@ -14,8 +14,8 @@ To facilitate precompilation and reduce latency, we avoid creation of anonymous 
 `thunk` can be used as an argument in `schedule(Task(thunk))`.  Adapted from `Revise`.
 """
 struct TaskThunk
-    f
-    args
+    f::Any
+    args::Any
 end
 @noinline (thunk::TaskThunk)() = thunk.f(thunk.args...)
 
@@ -71,7 +71,7 @@ function watch_task(history_file, repl_history_file=nothing)
             if configuration["file_polling"]
                 previous, current = FileWatching.poll_file(
                     history_file,
-                    configuration["file_polling_interval"]
+                    configuration["file_polling_interval"],
                 )
                 has_changed = (
                     current isa FileWatching.StatStruct &&
@@ -84,19 +84,23 @@ function watch_task(history_file, repl_history_file=nothing)
 
             if has_changed
                 history_lines = readlines(history_file_handle)
+                isempty(history_lines) && continue
                 @debug "Diary.jl ($history_file): History file has changed:" history_lines
                 # Update user configuration.
                 configuration = read_configuration()
                 # Copy history lines to the REPL history file
                 if configuration["persistent_history"] && !isnothing(repl_history_file)
-                    open(repl_history_file, read=true, write=true) do io
-                        seekend(io)
-                        println(io, join(history_lines, '\n'))
+                    joined_history_lines = join(history_lines, '\n')
+                    if !all(isspace, joined_history_lines)
+                        open(repl_history_file, read=true, write=true) do io
+                            seekend(io)
+                            println(io, joined_history_lines)
+                        end
                     end
                 end
                 # Parse history lines to put in the diary.
                 diary_lines = parse_history(history_lines)
-                iszero(length(diary_lines)) && continue
+                isempty(diary_lines) && continue
                 # Skip if the lines do not parse.
                 try
                     Meta.parse(join(diary_lines, '\n'))
@@ -119,12 +123,13 @@ function watch_task(history_file, repl_history_file=nothing)
                     1;
                     configuration=configuration,
                     diary_file=diary_file,
-                    with_header=with_header
+                    with_header=with_header,
                 )
             end
         end
     catch e
-        @error "Diary.jl ($history_file)" exception=(e, catch_backtrace())
+        e isa Base.IOError ||
+            @error "Diary.jl ($history_file)" exception = (e, catch_backtrace())
     finally
         # Clean-up.
         close(history_file_handle)
@@ -255,7 +260,7 @@ function read_configuration(filename=find_configuration_file())
     catch e
         @warn(
             "Diary.jl: an error occured while parsing configuration file: $filename",
-            exception=(e, catch_backtrace()),
+            exception = (e, catch_backtrace()),
         )
         return configuration
     end
@@ -290,9 +295,7 @@ function default_configuration()
     return Dict{String,Any}(
         "author" => "",
         "autocommit" => true,
-        "blacklist" => [
-            joinpath(DEPOT_PATH[1], "environments"),
-        ],
+        "blacklist" => [joinpath(DEPOT_PATH[1], "environments")],
         "create_if_missing" => true,
         "date_format" => "E U d HH:MM",
         "diary_name" => "diary.jl",
@@ -314,10 +317,10 @@ Commit the `n` latest recorded lines to the diary file.
 - `with_header`: Write header before lines. (default: `true`)
 """
 function commit(
-    n = length(GLOBAL_SEGMENT_BUFFER);
-    configuration = read_configuration(),
-    diary_file = find_diary(; configuration=configuration),
-    with_header = true,
+    n=length(GLOBAL_SEGMENT_BUFFER);
+    configuration=read_configuration(),
+    diary_file=find_diary(; configuration=configuration),
+    with_header=true,
 )
     # If the diary file could not be found, no lines were written
     isnothing(diary_file) && return 0
@@ -337,9 +340,9 @@ function commit(
                 write_header(io; configuration=configuration)
                 with_header = false
             elseif (
-                length(segment) > 1
-                && !startswith(last_diary_line, "#")
-                && !all(isspace, last_diary_line)
+                length(segment) > 1 &&
+                !startswith(last_diary_line, "#") &&
+                !all(isspace, last_diary_line)
             )
                 # Print an extra newline before multiline entries, if the last line
                 # was not a comment or a newline.
@@ -380,10 +383,9 @@ Erase the contents of the current diary.  This function does not remove the file
 - `configuration`: (default: `read_configuration()`)
 - `diary_file`: (default: `find_diary(; configuration)`)
 """
-function erase_diary(
-    ;
-    configuration = read_configuration(),
-    diary_file = find_diary(; configuration=configuration),
+function erase_diary(;
+    configuration=read_configuration(),
+    diary_file=find_diary(; configuration=configuration),
 )
     isfile(diary_file) && open(diary_file, write=true) do io
         print(io, "")

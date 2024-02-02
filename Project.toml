@@ -1,7 +1,7 @@
 name = "Diary"
 uuid = "601e5a01-99c6-4314-b727-62e0eec533dd"
-authors = ["Sakse <dalum@users.noreply.github.com>"]
-version = "0.1.4"
+authors = ["Sari Sakse Dalum <dalum@users.noreply.github.com>"]
+version = "0.1.5"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
